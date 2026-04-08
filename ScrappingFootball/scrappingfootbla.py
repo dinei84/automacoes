@@ -1,49 +1,122 @@
 import asyncio
+import sys
+from urllib.parse import urljoin
+
+from flask import Flask, render_template, request
 from playwright.async_api import async_playwright
 
-async def crawler_onde_assistir_spfc():
+TIMES_PARA_MONITORAR = [
+    {"nome": "Sao Paulo", "slug": "sao-paulo"},
+    {"nome": "Palmeiras", "slug": "palmeiras"},
+    {"nome": "Corinthians", "slug": "corinthians"},
+    {"nome": "Santos", "slug": "santos"},
+    {"nome": "Flamengo", "slug": "flamengo"},
+    {"nome": "Vasco", "slug": "vasco"},
+    {"nome": "Gremio", "slug": "gremio"},
+    {"nome": "Internacional", "slug": "internacional"},
+    {"nome": "Atletico-MG", "slug": "atletico-mg"},
+    {"nome": "Cruzeiro", "slug": "cruzeiro"},
+]
+
+app = Flask(__name__, template_folder="templates", static_folder="static")
+
+
+async def buscar_info_jogo(browser_context, time_info):
+    """Processa um time por vez e retorna horario/transmissao."""
+    nome = time_info["nome"]
+    slug = time_info["slug"]
+    page = await browser_context.new_page()
+    url_base = f"https://ge.globo.com/futebol/times/{slug}/"
+
+    try:
+        await page.goto(url_base, timeout=60000)
+        link_elemento = page.locator("a[href*='onde-assistir']").first
+
+        if await link_elemento.count() == 0:
+            return {
+                "sucesso": False,
+                "horario": None,
+                "transmissao": None,
+                "mensagem": "Nenhuma noticia de 'onde assistir' encontrada no momento.",
+            }
+
+        link_noticia = await link_elemento.get_attribute("href")
+        if not link_noticia:
+            return {
+                "sucesso": False,
+                "horario": None,
+                "transmissao": None,
+                "mensagem": "Link da noticia nao encontrado.",
+            }
+
+        await page.goto(urljoin(url_base, link_noticia), timeout=60000)
+
+        transmissao = await page.locator("li:has-text('Transmiss')").first.inner_text()
+        horario = await page.locator("li:has-text('Hor')").first.inner_text()
+
+        return {
+            "sucesso": True,
+            "horario": horario.strip(),
+            "transmissao": transmissao.strip(),
+            "mensagem": "Informacao obtida com sucesso.",
+        }
+    except Exception:
+        return {
+            "sucesso": False,
+            "horario": None,
+            "transmissao": None,
+            "mensagem": f"Erro ao processar {nome}. Tente novamente mais tarde.",
+        }
+    finally:
+        await page.close()
+
+
+async def buscar_info_jogo_selecionado(time_info):
     async with async_playwright() as p:
-        # Lançamos o browser
-        browser = await p.chromium.launch(headless=False) 
-        page = await browser.new_page()
-        
-        print("🔍 Passo 1: Buscando a notícia do próximo jogo...")
-        await page.goto("https://ge.globo.com/futebol/times/sao-paulo/")
+        browser = await p.chromium.launch(headless=True)
+        context = await browser.new_context()
+        resultado = await buscar_info_jogo(context, time_info)
+        await browser.close()
+        return resultado
 
-        # SELETOR TÉCNICO: Procuramos um link (a) que contenha 'onde-assistir' no endereço (href)
-        # O '*' significa 'contém'
-        selector_link = "a[href*='onde-assistir']"
-        
-        try:
-            # Esperamos o link aparecer na home
-            await page.wait_for_selector(selector_link, timeout=5000)
-            
-            # Pegamos o link real da notícia
-            link_noticia = await page.get_attribute(selector_link, "href")
-            print(f"🔗 Notícia encontrada: {link_noticia}")
 
-            # Passo 2: Navegar para a notícia específica
-            print("🚀 Navegando para os detalhes da transmissão...")
-            await page.goto(link_noticia)
+@app.route("/", methods=["GET"])
+def index():
+    return render_template("index.html", times=TIMES_PARA_MONITORAR, resultado=None, selecionado=None)
 
-            # Passo 3: Extrair Horário e Canal
-            print("📡 Extraindo informações de horário e transmissão...")
 
-            transmissao_element = page.locator("li:has-text('Transmissão')")
-            horario_element = page.locator("li:has-text('Horário')")
-            
-            # Verificamos se eles existem antes de extrair o texto
-            info_transmissao = await transmissao_element.inner_text() if await transmissao_element.count() > 0 else "Não encontrado"
-            info_horario = await horario_element.inner_text() if await horario_element.count() > 0 else "Não encontrado"
+@app.route("/buscar", methods=["POST"])
+def buscar():
+    nome_time = request.form.get("time")
+    time_info = next((t for t in TIMES_PARA_MONITORAR if t["nome"] == nome_time), None)
 
-            print(f"\n⚽ INFORMAÇÕES DO JOGO")
-            print(f"📺 {info_transmissao}")
-            print(f"⏰ {info_horario}")
+    if not time_info:
+        return render_template(
+            "index.html",
+            times=TIMES_PARA_MONITORAR,
+            resultado={"sucesso": False, "mensagem": "Time invalido. Selecione um time da lista."},
+            selecionado=None,
+        )
 
-        except Exception as e:
-            print(f"❌ Erro: Não foi possível encontrar a notícia de transmissão. {e}")
-        
+    resultado = asyncio.run(buscar_info_jogo_selecionado(time_info))
+    return render_template("index.html", times=TIMES_PARA_MONITORAR, resultado=resultado, selecionado=nome_time)
+
+
+async def main_scraper():
+    async with async_playwright() as p:
+        browser = await p.chromium.launch(headless=True)
+        context = await browser.new_context()
+        for time in TIMES_PARA_MONITORAR:
+            resultado = await buscar_info_jogo(context, time)
+            if resultado["sucesso"]:
+                print(f"[OK] {time['nome']}: {resultado['horario']} | {resultado['transmissao']}")
+            else:
+                print(f"[ERRO] {time['nome']}: {resultado['mensagem']}")
         await browser.close()
 
+
 if __name__ == "__main__":
-    asyncio.run(crawler_onde_assistir_spfc())
+    if len(sys.argv) > 1 and sys.argv[1] == "--cli":
+        asyncio.run(main_scraper())
+    else:
+        app.run(host="0.0.0.0", port=5000, debug=False)
