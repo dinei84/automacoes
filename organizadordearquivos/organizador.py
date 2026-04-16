@@ -1,7 +1,14 @@
 import os
 import shutil
+import platform
 
-PASTA_ORIGEM = os.path.join(os.path.expanduser("~"), "Downloads")
+nome_maquina = platform.node()
+print(f"Olá, {nome_maquina}! Iniciando organização da pasta...")
+
+if nome_maquina == "g10ar":
+    PASTA_ORIGEM = r"C:\Users\g10ar\Downloads"
+else:
+    PASTA_ORIGEM = os.path.join(os.path.expanduser("~"), "Downloads")
 
 MAPA_EXTENSOES = {
     "Imagens": [".jpg", ".jpeg", ".png", ".gif"],
@@ -44,13 +51,15 @@ def organizar_pasta():
                 print(f"📦 '{arquivo}' não listado -> Movido para 'Outros'")
 
 
+caminho_script = os.path.dirname(os.path.abspath(__file__))
+
 if __name__ == "__main__":
     try:
         organizar_pasta()
         # Cria um arquivo de texto para confirmar que rodou
-        with open(os.path.join(PASTA_ORIGEM, "log_sucesso.txt"), "a") as f:
-            f.write(f"Rodou com sucesso em: {os.path.abspath(PASTA_ORIGEM)}\n")
+        with open(os.path.join(caminho_script, "log_sucesso.txt"), "a") as f:
+            f.write(f"Rodou com sucesso em: {platform.node()} - {PASTA_ORIGEM}\n")
     except Exception as e:
         # Se der erro, ele salva o motivo aqui
-        with open(os.path.join(PASTA_ORIGEM, "erro_automacao.txt"), "a") as f:
+        with open(os.path.join(caminho_script, "erro_automacao.txt"), "a") as f:
             f.write(f"Erro: {str(e)}\n")

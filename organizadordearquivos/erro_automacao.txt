@@ -1,0 +1,1 @@
+Erro: [WinError 32] O arquivo já está sendo usado por outro processo: 'C:\\Users\\g10ar\\Downloads\\brModelo.jar'
