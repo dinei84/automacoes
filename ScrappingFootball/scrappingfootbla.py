@@ -1,9 +1,9 @@
 import asyncio
 import os
 import sys
-from urllib.parse import urljoin
-
 from flask import Flask, render_template, request
+from flask_cors import CORS
+from urllib.parse import urljoin
 from playwright.async_api import async_playwright
 
 TIMES_PARA_MONITORAR = [
@@ -20,6 +20,7 @@ TIMES_PARA_MONITORAR = [
 ]
 
 app = Flask(__name__, template_folder="templates", static_folder="static")
+CORS(app, resources={r"/*": {"origins": "*"}})
 
 
 async def buscar_info_jogo(browser_context, time_info):
