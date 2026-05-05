@@ -63,11 +63,18 @@ O projeto já foi preparado para deploy no Render com os seguintes ajustes:
 2. Conecte ao repositório `automacoes/ScrappingFootball`.
 3. Caso use o `render.yaml`, o Render lerá estas configurações automaticamente.
 4. Se configurar manualmente, use:
-   - `Build Command`: `pip install -r requirements.txt && playwright install chromium`
+   - `Build Command`: `pip install -r ./requirements.txt && playwright install chromium`
    - `Start Command`: `gunicorn scrappingfootbla:app --bind 0.0.0.0:$PORT`
+   - Atenção: cole o comando exatamente como acima, sem formatação Markdown ou links.
 5. Adicione variáveis de ambiente no Render se precisar (opcional):
    - `FLASK_ENV=production`
    - `PYTHONUNBUFFERED=1`
+
+### Troubleshooting: requisitos não encontrados
+
+- Verifique se o serviço no Render está usando a raiz do repositório como diretório de trabalho.
+- Se você estiver usando um `Root Directory`, deixe-o em branco para usar a pasta principal onde está `requirements.txt`.
+- Garanta que o comando de build esteja exatamente como texto simples, sem copiar links ou formatação do editor.
 
 ### Deploy via GitHub Actions
 
